@@ -108,8 +108,17 @@ exports.handler = async (event) => {
 async function handleChat(message, rawBody) {
   const extracted = await extractIntentAndProperty(message);
 
-  // For now, just echo what we extracted
+  // Build a debug reply string so the UI gets what it expects
+  const replyText =
+    `Intent: ${extracted.intent}\n` +
+    `Property: ${extracted.propertyName ?? "null"}\n` +
+    `Info to find: ${extracted.informationToFind ?? "null"}\n` +
+    `Input: ${extracted.inputMessage}`;
+
+  // Frontend expects at least { reply: string }
+  // We also include the structured fields for later use.
   return {
+    reply: replyText,
     intent: extracted.intent,
     propertyName: extracted.propertyName,
     informationToFind: extracted.informationToFind,
