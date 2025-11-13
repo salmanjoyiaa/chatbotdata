@@ -1,5 +1,9 @@
 // netlify/functions/chat.js
 
+const { extractIntentAndProperty } = require("./intentExtractor");
+const { generateGeneralReply } = require("./generalReply");
+const { handlePropertyQuery } = require("./propertyHandler");
+
 exports.handler = async (event) => {
   const origin = event.headers.origin || event.headers.Origin || "*";
 
@@ -16,7 +20,6 @@ exports.handler = async (event) => {
     };
   }
 
-  // Only allow POST for main handler
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
@@ -62,14 +65,22 @@ exports.handler = async (event) => {
         "Access-Control-Allow-Origin": origin,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        error: "Missing 'message' in request body",
-      }),
+      body: JSON.stringify({ error: "Missing 'message' in request body" }),
     };
   }
 
   try {
-    const replyPayload = await handleChat(message, body);
+    // STEP 1: extract intent + property info
+    const extracted = await extractIntentAndProperty(message);
+
+    let reply;
+    if (extracted.intent !== "property_query") {
+      // STEP 2: general chat answer
+      reply = await generateGeneralReply(message);
+    } else {
+      // Property query path (for now: debug reply; later: Sheets logic)
+      reply = await handlePropertyQuery(extracted);
+    }
 
     return {
       statusCode: 200,
@@ -77,7 +88,13 @@ exports.handler = async (event) => {
         "Access-Control-Allow-Origin": origin,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(replyPayload),
+      body: JSON.stringify({
+        reply,
+        intent: extracted.intent,
+        propertyName: extracted.propertyName,
+        informationToFind: extracted.informationToFind,
+        inputMessage: extracted.inputMessage,
+      }),
     };
   } catch (err) {
     console.error("Chat handler error:", err);
@@ -94,203 +111,3 @@ exports.handler = async (event) => {
     };
   }
 };
-
-/**
- * STEP 1:
- * Call Groq to extract:
- *  - intent              (e.g. "property_query", "greeting", "other")
- *  - propertyName        (e.g. "Clara Lane", "Hidden Forest", "301", "125N")
- *  - informationToFind   (e.g. "wifi login", "parking", "camera", "owner")
- *  - inputMessage        (original message)
- *
- * For now, we just return these four fields so you can see the output.
- */
-async function handleChat(message, rawBody) {
-  const extracted = await extractIntentAndProperty(message);
-
-  // If it's NOT a property query (greeting, small talk, other questions)
-  if (extracted.intent !== "property_query") {
-    const aiReply = await generateGeneralReply(message);
-
-    return {
-      reply: aiReply,
-      intent: extracted.intent,
-      propertyName: extracted.propertyName,
-      informationToFind: extracted.informationToFind,
-      inputMessage: extracted.inputMessage,
-    };
-  }
-
-  // For property queries, we will later add:
-  //  - Google Sheets lookup
-  //  - relevant AI answer from property data
-  // For now, keep a debug reply so we see what was extracted.
-  const debugReply =
-    `Property query detected.\n` +
-    `Property: ${extracted.propertyName ?? "null"}\n` +
-    `Info to find: ${extracted.informationToFind ?? "null"}\n` +
-    `Input: ${extracted.inputMessage}`;
-
-  return {
-    reply: debugReply,
-    intent: extracted.intent,
-    propertyName: extracted.propertyName,
-    informationToFind: extracted.informationToFind,
-    inputMessage: extracted.inputMessage,
-  };
-}
-/**
- * For non–property queries:
- * Ask Groq to answer in a friendly, casually professional tone.
- * The assistant should say it only knows about Dream State properties.
- */
-async function generateGeneralReply(message) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing GROQ_API_KEY environment variable");
-  }
-
-  const model = process.env.GROQ_MODEL || "llama-3.1-70b-versatile";
-
-  const systemPrompt = `
-You are "Property AI", a friendly, casually professional assistant for Dream State properties.
-
-Guidelines:
-- Answer the guest's question in a warm, concise, professional tone.
-- You ONLY know about Dream State properties, bookings, and stay-related topics.
-- If the user asks about anything not related to Dream State properties or their stay,
-  politely say that you only have information about Dream State properties and try to
-  guide them back to property-related questions.
-- Keep replies short and conversational (2–5 sentences max).
-`.trim();
-
-  const payload = {
-    model,
-    temperature: 0.7,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: message },
-    ],
-  };
-
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => res.statusText);
-    throw new Error(`Groq general reply error ${res.status}: ${errText}`);
-  }
-
-  const data = await res.json();
-  const reply =
-    data?.choices?.[0]?.message?.content ||
-    "Sorry, I couldn't generate a response right now.";
-
-  return reply;
-}
-
-
-/**
- * Uses Groq Chat API (OpenAI-compatible) to extract structured fields.
- * Requires env var: GROQ_API_KEY
- * Optional: GROQ_MODEL (default: llama-3.1-70b-versatile)
- */
-async function extractIntentAndProperty(message) {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing GROQ_API_KEY environment variable");
-  }
-
-  const model = process.env.GROQ_MODEL || "llama-3.1-70b-versatile";
-
-  const systemPrompt = `
-You are an information extractor for a property AI assistant.
-
-Given a guest's message, you must return a JSON object with this exact shape:
-
-{
-  "intent": "property_query" | "greeting" | "other",
-  "propertyName": string | null,
-  "informationToFind": string | null,
-  "inputMessage": string
-}
-
-Definitions:
-- "property_query": user is asking about a specific property or unit
-  (examples: "Clara Lane", "Hidden Forest", "301", "Unit 125N", "Apartment 4B").
-- "greeting": simple greetings or small talk ("hi", "hello", "how are you").
-- "other": anything that is not clearly a property query or greeting.
-
-Rules:
-- propertyName: 
-    - Extract the most likely property or unit name mentioned
-      (like "Clara Lane", "Hidden Forest", "301", "125N").
-    - If none is mentioned, use null.
-- informationToFind:
-    - Short description of what the user wants:
-      examples: "wifi login", "parking", "camera", "property owner",
-                "check-in time", "gate code", "pet policy".
-    - If unclear, try your best guess; if really none, use null.
-- inputMessage:
-    - Always return the original user message as received.
-
-Return ONLY valid JSON that can be parsed with JSON.parse. No extra text.
-  `.trim();
-
-  const payload = {
-    model,
-    temperature: 0,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: message },
-    ],
-  };
-
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => res.statusText);
-    throw new Error(`Groq extractor error ${res.status}: ${errText}`);
-  }
-
-  const data = await res.json();
-  const content =
-    data?.choices?.[0]?.message?.content ||
-    '{"intent":"other","propertyName":null,"informationToFind":null,"inputMessage":""}';
-
-  let parsed;
-  try {
-    parsed = JSON.parse(content);
-  } catch (err) {
-    console.warn("Failed to parse Groq JSON, content:", content);
-    // Fallback: still return something useful
-    parsed = {
-      intent: "other",
-      propertyName: null,
-      informationToFind: null,
-      inputMessage: message,
-    };
-  }
-
-  // Normalize fields and provide defaults
-  return {
-    intent: parsed.intent || "other",
-    propertyName: parsed.propertyName ?? null,
-    informationToFind: parsed.informationToFind ?? null,
-    inputMessage: parsed.inputMessage || message,
-  };
-}
