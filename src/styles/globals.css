@@ -2,23 +2,80 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body, #root { height: 100%; overflow: hidden; }
 
-html, body, #root { height: 100%; }
+body {
+  @apply bg-gradient-to-br from-slate-50 via-white to-blue-50;
+}
 
-
-/* Scrollbar (subtle) */
-*::-webkit-scrollbar { width: 10px; height: 10px; }
-*::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.15); border-radius: 9999px; }
+/* Scrollbar styling */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { 
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.4), rgba(29, 114, 243, 0.4));
+  border-radius: 9999px; 
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { 
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.6), rgba(29, 114, 243, 0.6));
+  background-clip: padding-box;
+}
 *::-webkit-scrollbar-track { background: transparent; }
 
-
-/* Chat bubble triangles */
-.bubble:after {
-content: "";
-position: absolute;
-bottom: 0.5rem;
-width: 0; height: 0;
-border: 8px solid transparent;
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
 }
-.bubble.bot:after { left: -6px; border-right-color: rgba(255,255,255,0.9); }
-.bubble.user:after { right: -6px; border-left-color: #1d72f3; }
+
+/* Chat bubble styling */
+.bubble {
+  position: relative;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Input field smooth transitions */
+textarea {
+  transition: all 0.2s ease;
+}
+
+textarea:focus {
+  @apply ring-2 ring-blue-400/50;
+}
+
+/* Button smooth interactions */
+button {
+  transition: all 0.2s ease;
+}
+
+button:active {
+  @apply scale-95;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Pulse animation for loading */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
