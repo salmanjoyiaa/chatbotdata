@@ -9,7 +9,7 @@ async function extractIntentAndProperty(message) {
   const model = process.env.GROQ_MODEL || "llama-3.1-70b-versatile";
 
   const systemPrompt = `
-You are an information extractor for a property AI assistant.
+You are an information extractor for a property AI assistant for Dream State.
 
 Given a guest's message, you must return a JSON object with this exact shape:
 
@@ -26,20 +26,24 @@ Definitions:
 - "greeting": simple greetings or small talk ("hi", "hello", "how are you").
 - "other": anything that is not clearly a property query or greeting.
 
-Rules:
-- propertyName: 
-    - Extract the most likely property or unit name mentioned
-      (like "Clara Lane", "Hidden Forest", "301", "125N").
-    - If none is mentioned, use null.
-- informationToFind:
-    - Short description of what the user wants:
-      examples: "wifi login", "parking", "camera", "property owner",
-                "check-in time", "gate code", "pet policy".
-    - If unclear, try your best guess; if really none, use null.
-- inputMessage:
-    - Always return the original user message as received.
+propertyName:
+- Match the property or unit from the user's message.
+- It should correspond to either:
+  - "Unit #" (e.g. "301", "125N"), or
+  - "Title on Listing's Site" (e.g. "Clara Lane Retreat", "Hidden Forest").
+- If no clear property is mentioned, use null.
 
-Return ONLY valid JSON that can be parsed with JSON.parse. No extra text.
+informationToFind:
+- A short natural-language description of what the guest is asking about,
+  e.g. "wifi password", "wifi login", "door lock code", "trash instructions",
+  "trash day", "parking", "quiet hours", "pool temperature", "owner name",
+  "handyman number".
+- If nothing is clear, use null.
+
+inputMessage:
+- Always return the original user message exactly as received.
+
+Return ONLY valid JSON, no markdown, no explanation.
 `.trim();
 
   const payload = {
