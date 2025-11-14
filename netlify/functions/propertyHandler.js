@@ -10,7 +10,7 @@ const { google } = require("googleapis");
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 
 // The tab name (adjust if needed)
-const SHEET_TAB = "Sheet1";
+const SHEET_TAB = "Info";
 
 // Cache for 10 minutes
 let cache = {
