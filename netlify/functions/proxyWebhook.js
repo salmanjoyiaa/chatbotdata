@@ -2,8 +2,8 @@
 
 const { extractIntentAndProperty } = require("./intentExtractor");
 const { generateGeneralReply } = require("./generalReply");
-const { handlePropertyQuery } = require("./propertyHandler");
-const { resolveFieldType } = require("./fieldTypeResolver");   // <- NEW
+const { handlePropertyQuery, handleDatasetQuery } = require("./propertyHandler");
+const { resolveFieldType } = require("./fieldTypeResolver");
 
 exports.handler = async (event) => {
   const origin = event.headers.origin || event.headers.Origin || "*";
@@ -71,21 +71,41 @@ exports.handler = async (event) => {
   }
 
   try {
-    // STEP 1: extract intent + property info
-        // STEP 1: extract intent + property info
+    // ---------------------------------------
+    // STEP 1: Intent extraction
+    // ---------------------------------------
     const extracted = await extractIntentAndProperty(message);
 
-    // STEP 2a: local fieldType resolution (based on informationToFind + full message)
-    const fieldType = resolveFieldType(extracted.informationToFind, extracted.inputMessage);
+    // ---------------------------------------
+    // STEP 2: Field type resolution (only used for property_query)
+    // ---------------------------------------
+    const fieldType = resolveFieldType(
+      extracted.informationToFind,
+      extracted.inputMessage
+    );
     extracted.fieldType = fieldType;
 
+    console.log("Extracted intent object:", extracted);
+
     let reply;
-    if (extracted.intent !== "property_query") {
-      // Non-property queries -> general AI reply
-      reply = await generateGeneralReply(message);
-    } else {
-      // Property query path -> goes through property handler
+
+    // ---------------------------------------
+    // NEW: DATASET QUERIES
+    // ---------------------------------------
+    if (extracted.intent === "dataset_query") {
+      reply = await handleDatasetQuery(extracted);
+    }
+    // ---------------------------------------
+    // PROPERTY QUERIES
+    // ---------------------------------------
+    else if (extracted.intent === "property_query") {
       reply = await handlePropertyQuery(extracted);
+    }
+    // ---------------------------------------
+    // GENERAL REPLIES
+    // ---------------------------------------
+    else {
+      reply = await generateGeneralReply(message);
     }
 
     return {
@@ -96,11 +116,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         reply,
-        intent: extracted.intent,
-        propertyName: extracted.propertyName,
-        informationToFind: extracted.informationToFind,
-        fieldType: extracted.fieldType,              // now set by resolveFieldType()
-        inputMessage: extracted.inputMessage,
+        ...extracted,
       }),
     };
   } catch (err) {
