@@ -83,7 +83,6 @@ datasetIntentType:
   1) "owner_with_most_properties"
      - The guest asks who owns the most properties overall.
      - Example: "Who has the most properties?"
-       or "Which owner has the most units?"
 
   2) "count_properties_by_owner"
      - The guest asks how many properties a specific owner has.
@@ -93,19 +92,12 @@ datasetIntentType:
      - The guest asks to list all properties for a specific owner.
      - Example: "Show me all properties owned by DS/Amber."
 
-  4) "best_rated_property"
-     - The guest asks which property has the highest rating overall.
-     - Example: "What is the best rated property?"
-       or "Which listing has the highest Airbnb rating?"
+  4) "count_total_properties"
+     - The guest asks how many properties/units exist in total.
+     - Example: "How many properties do we manage in total?"
 
-  5) "properties_with_pool"
-     - The guest asks which properties have a pool or hot tub.
-     - Example: "Which properties have a pool?"
-       or "List all listings with a pool or hot tub."
-
-- If the question doesn't match any of these patterns, set datasetIntentType to null
-  and intent should likely be "other" (or "property_query" if it is clearly about
-  a single property).
+If the question doesn't match any of these patterns, set datasetIntentType to null
+and intent should likely be "other" (or "property_query" if focused on one unit).
 
 datasetOwnerName:
 - Use ONLY when datasetIntentType is "count_properties_by_owner"

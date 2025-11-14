@@ -76,29 +76,39 @@ exports.handler = async (event) => {
     // ----------------------------------------------------
     // STEP 1: INTENT EXTRACTION
     // ----------------------------------------------------
-        // STEP 1: extract intent + property / dataset info
     const extracted = await extractIntentAndProperty(message);
 
-    // STEP 2a: local fieldType resolution (based on informationToFind + full message)
-    const fieldType = resolveFieldType(
+    // ----------------------------------------------------
+    // STEP 2: FIELD TYPE + DATASET HINT RESOLUTION
+    // ----------------------------------------------------
+    const { fieldType, datasetHint } = resolveFieldType(
       extracted.informationToFind,
       extracted.inputMessage
     );
+
     extracted.fieldType = fieldType;
+    extracted.datasetHint = datasetHint;
+
+    console.log("Extracted intent:", extracted);
 
     let reply;
 
-    if (extracted.intent === "property_query") {
-      // Property-level question → Google Sheet, single row
-      reply = await handlePropertyQuery(extracted);
-    } else if (extracted.intent === "dataset_query") {
-      // Dataset-level question → Google Sheet, aggregate
+    // ----------------------------------------------------
+    // STEP 3: ROUTING LOGIC
+    // ----------------------------------------------------
+
+    // DATASET QUERIES
+    if (extracted.intent === "dataset_query") {
       reply = await handleDatasetQuery(extracted);
-    } else {
-      // Greetings / other → general LLM reply
+    }
+    // PROPERTY QUERIES
+    else if (extracted.intent === "property_query") {
+      reply = await handlePropertyQuery(extracted);
+    }
+    // GENERAL CHAT
+    else {
       reply = await generateGeneralReply(message);
     }
-
 
     // ----------------------------------------------------
     // STEP 4: SEND RESPONSE
