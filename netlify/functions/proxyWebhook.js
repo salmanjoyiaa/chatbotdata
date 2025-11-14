@@ -8,7 +8,7 @@ const { resolveFieldType } = require("./fieldTypeResolver");
 exports.handler = async (event) => {
   const origin = event.headers.origin || event.headers.Origin || "*";
 
-  // --- CORS preflight ---
+  // --- CORS PRE-FLIGHT ---
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 200,
@@ -38,16 +38,18 @@ exports.handler = async (event) => {
       headers: { "Access-Control-Allow-Origin": origin },
       body: JSON.stringify({
         error:
-          "Server runtime does not provide fetch API. Ensure Node >= 18 or add a fetch polyfill.",
+          "Server runtime does not provide fetch API. Ensure Node >= 18.",
       }),
     };
   }
 
-  // Parse JSON body
+  // -------------------------
+  // Parse JSON BODY
+  // -------------------------
   let body;
   try {
     body = event.body ? JSON.parse(event.body) : {};
-  } catch (e) {
+  } catch {
     return {
       statusCode: 400,
       headers: {
@@ -71,43 +73,46 @@ exports.handler = async (event) => {
   }
 
   try {
-    // ---------------------------------------
-    // STEP 1: Intent extraction
-    // ---------------------------------------
+    // ----------------------------------------------------
+    // STEP 1: INTENT EXTRACTION
+    // ----------------------------------------------------
     const extracted = await extractIntentAndProperty(message);
 
-    // ---------------------------------------
-    // STEP 2: Field type resolution (only used for property_query)
-    // ---------------------------------------
-    const fieldType = resolveFieldType(
+    // ----------------------------------------------------
+    // STEP 2: FIELD TYPE + DATASET HINT RESOLUTION
+    // ----------------------------------------------------
+    const { fieldType, datasetHint } = resolveFieldType(
       extracted.informationToFind,
       extracted.inputMessage
     );
-    extracted.fieldType = fieldType;
 
-    console.log("Extracted intent object:", extracted);
+    extracted.fieldType = fieldType;
+    extracted.datasetHint = datasetHint;
+
+    console.log("Extracted intent:", extracted);
 
     let reply;
 
-    // ---------------------------------------
-    // NEW: DATASET QUERIES
-    // ---------------------------------------
+    // ----------------------------------------------------
+    // STEP 3: ROUTING LOGIC
+    // ----------------------------------------------------
+
+    // DATASET QUERIES
     if (extracted.intent === "dataset_query") {
       reply = await handleDatasetQuery(extracted);
     }
-    // ---------------------------------------
     // PROPERTY QUERIES
-    // ---------------------------------------
     else if (extracted.intent === "property_query") {
       reply = await handlePropertyQuery(extracted);
     }
-    // ---------------------------------------
-    // GENERAL REPLIES
-    // ---------------------------------------
+    // GENERAL CHAT
     else {
       reply = await generateGeneralReply(message);
     }
 
+    // ----------------------------------------------------
+    // STEP 4: SEND RESPONSE
+    // ----------------------------------------------------
     return {
       statusCode: 200,
       headers: {
@@ -129,7 +134,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         error: "Internal server error",
-        detail: String(err && err.message ? err.message : err),
+        detail: String(err?.message || err),
       }),
     };
   }

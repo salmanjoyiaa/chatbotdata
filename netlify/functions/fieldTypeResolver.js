@@ -6,175 +6,142 @@ function norm(str) {
 }
 
 /**
- * Resolve a canonical fieldType from the user's requested info.
- * Uses simple keyword rules based on your sheet headers.
+ * Resolve two things:
+ * 1) fieldType → used for property-level answers
+ * 2) datasetHint → used for dataset analytics (all-properties queries)
  *
- * @param {string|null} informationToFind - short phrase from Groq (e.g. "wifi password", "door code")
- * @param {string} message - full original user message
- * @returns {string|null} fieldType
+ * @returns { fieldType: string|null, datasetHint: string|null }
  */
 function resolveFieldType(informationToFind, message) {
   const info = norm(informationToFind);
   const full = norm(message);
-
   const text = (info + " " + full).trim();
 
-  // --- WIFI ---
-  if (text.includes("wifi") || text.includes("wi-fi") || text.includes("internet") || text.includes("network")) {
-    if (text.includes("speed")) return "wifi_speed";                   // Wifi Speed (Mbps) on Listing
-    if (text.includes("provider") || text.includes("router")) return "wifi_provider"; // Wifi Provider Routerr
-    if (text.includes("login") || text.includes("password") || text.includes("passcode")) {
-      return "wifi_login";                                             // Wifi Login / WIFI INFO / WIFI INFORMATION/ LOGIN
-    }
-    // generic wifi question -> details
-    return "wifi_details";
+  // Default outputs
+  let fieldType = null;
+  let datasetHint = null;
+
+  // -------------------------------------
+  // DATASET INTELLIGENCE HINTS
+  // (Used by dataset_query handling)
+  // -------------------------------------
+
+  if (text.includes("owner") || text.includes("owned by")) {
+    datasetHint = "owner";
   }
 
-  // --- LOCK / CODES ---
-  if (text.includes("code") || text.includes("lock") || text.includes("keypad")) {
-    if (text.includes("closet")) {
-      return "owners_closet_code";           // Owners closet code
-    }
-    if (text.includes("storage")) {
-      return "storage_room_password";        // Storage Room password.
-    }
-    // Default: door lock code
-    return "door_lock_code";                 // Lock Codes and Info, Door Lock
+  if (text.includes("pool") || text.includes("hot tub") || text.includes("jacuzzi")) {
+    datasetHint = "pool";
   }
 
-  // --- TRASH ---
-  if (text.includes("trash") || text.includes("garbage") || text.includes("rubbish") || text.includes("bin") || text.includes("dumpster")) {
-    if (text.includes("day") || text.includes("pickup") || text.includes("schedule") || text.includes("reminder")) {
-      return "trash_day_reminder";           // Trash Day Reminder
-    }
-    if (text.includes("process") || text.includes("how") || text.includes("where") || text.includes("take out")) {
-      return "trash_process";                // Trash Process
-    }
-    // generic trash info
-    return "trash_info";                     // Trash Info / Trash Can info.
+  if (text.includes("parking")) {
+    datasetHint = "parking";
   }
 
-  // --- PARKING ---
-  if (text.includes("parking") || text.includes("park my car") || text.includes("car park") || text.includes("driveway")) {
-    return "parking";                        // Parking
+  if (text.includes("wifi") || text.includes("internet")) {
+    datasetHint = "wifi";
   }
 
-  // --- QUIET HOURS / NOISE ---
-  if (text.includes("quiet hours") || text.includes("noise") || text.includes("loud") || text.includes("party time")) {
-    return "quiet_hours";                    // Quite Hours
+  if (text.includes("rating")) {
+    datasetHint = "rating";
   }
 
-  // --- POOL / HOT TUB ---
-  if (text.includes("pool") || text.includes("hot tub") || text.includes("hottub") || text.includes("jacuzzi") || text.includes("spa")) {
-    if (text.includes("temperature") || text.includes("temp") || text.includes("heat") || text.includes("heated")) {
-      return "pool_temperature";             // Temperature of Pool
-    }
-    if (text.includes("fence") || text.includes("gate")) {
-      return "pool_fence_gate";              // Pool Fence / Gate
-    }
-    return "pool_info";                      // Pool and Hot tube
+  if (text.includes("guest favorite") || text.includes("guest fav")) {
+    datasetHint = "guest_fav";
   }
 
-  // --- OWNER / MANAGER / CONTACTS ---
-  if (text.includes("owner")) {
-    return "owner_name";                     // Property Owner name
-  }
-  if (text.includes("manager") || text.includes("property manager")) {
-    return "property_manager";               // Property Manger
-  }
-  if (text.includes("handyman") || text.includes("maintenance")) {
-    return "handyman_number";                // Handyman Number
+  if (text.includes("2 bedroom") || text.includes("3 bedroom") || text.match(/\b\d+br\b/)) {
+    datasetHint = "beds";
   }
 
-  // --- CHECK-IN / CHECK-OUT / EARLY / LATE ---
-  if (text.includes("check-in") || text.includes("check in") || text.includes("check-out") || text.includes("checkout") || text.includes("check out")) {
-    if (text.includes("early") || text.includes("late")) {
-      return "early_late_fee_link";          // Fee link for Early check-in/ Late check-out
-    }
-    return "checkin_checkout";               // Check-ins/Check-out
+  if (text.includes("max guests") || text.includes("how many people")) {
+    datasetHint = "guests";
   }
 
-  // --- RULES: events / pets / smoking / parties ---
-  if (text.includes("events")) {
-    return "events_policy";                  // Events
-  }
-  if (
-    text.includes("pet") ||
-    text.includes("dog") ||
-    text.includes("cat") ||
-    text.includes("smoking") ||
-    text.includes("smoke") ||
-    text.includes("party") ||
-    text.includes("parties")
-  ) {
-    return "pet_party_smoking_policy";       // Pet/Party/smoking
+  // -------------------------------------
+  // PROPERTY-LEVEL FIELD DETECTION
+  // -------------------------------------
+
+  // WIFI
+  if (text.includes("wifi") || text.includes("internet") || text.includes("network")) {
+    if (text.includes("speed")) fieldType = "wifi_speed";
+    else if (text.includes("provider") || text.includes("router")) fieldType = "wifi_provider";
+    else if (text.includes("login") || text.includes("password")) fieldType = "wifi_login";
+    else fieldType = "wifi_details";
   }
 
-  // --- AMENITIES / MISC ---
-  if (text.includes("bbq") || text.includes("grill") || text.includes("barbecue")) {
-    return "bbq_grill";                      // BBQ Grill
-  }
-  if (text.includes("camera") || text.includes("cctv") || text.includes("security camera")) {
-    return "camera_location";                // Camera Location
-  }
-  if (text.includes("air mattress") || text.includes("airmatress") || text.includes("extra bed")) {
-    return "air_mattress";                   // Air Matress
-  }
-  if (text.includes("supplies") || text.includes("soap") || text.includes("shampoo") || text.includes("toilet paper") || text.includes("coffee")) {
-    return "supplies_provided";              // Supplies provided
-  }
-  if (text.includes("first aid") || text.includes("fire extinguisher")) {
-    return "first_aid_fire_extinguisher";    // First Aid Kit & Fire Extinguisher
-  }
-  if (text.includes("washer") || text.includes("dryer") || text.includes("laundry")) {
-    return "washer_dryer";                   // Washer & Dryer
-  }
-  if (text.includes("pillow") || text.includes("blanket") || text.includes("bedding")) {
-    return "extra_pillows_bedding";          // Extra Pillows/Bedding
-  }
-  if (text.includes("notes") || text.includes("more info") || text.includes("anything else")) {
-    return "additional_notes";               // Additional Notes
+  // LOCK / CODES
+  if (!fieldType && (text.includes("code") || text.includes("lock") || text.includes("keypad"))) {
+    if (text.includes("closet")) fieldType = "owners_closet_code";
+    else if (text.includes("storage")) fieldType = "storage_room_password";
+    else fieldType = "door_lock_code";
   }
 
-  // --- STRUCTURAL / LISTING INFO ---
-  if (text.includes("price") || text.includes("rate") || text.includes("nightly")) {
-    return "price";                          // Price
-  }
-  if (text.includes("type") || text.includes("apartment") || text.includes("condo") || text.includes("house")) {
-    return "property_type";                  // Type
-  }
-  if (text.includes("floor")) {
-    return "floor";                          // Floor
-  }
-  if (text.includes("style") || text.includes("design") || text.includes("theme")) {
-    return "style";                          // Style
-  }
-  if (text.includes("bed") || text.includes("bath") || text.includes("bedroom") || text.includes("bathroom")) {
-    return "bed_bath";                       // Bed x Bath
-  }
-  if (text.includes("guest") || text.includes("how many people") || text.includes("max people")) {
-    return "max_guests";                     // Max Guests
-  }
-  if (text.includes("airbnb") || text.includes("listing") || text.includes("link")) {
-    if (text.includes("rating") || text.includes("review")) {
-      return "airbnb_rating";               // Airbnb Rating
-    }
-    return "airbnb_link";                   // Airbnb Listing Link
-  }
-  if (text.includes("photo") || text.includes("picture") || text.includes("images")) {
-    return "cover_photo";                   // Cover Photo
-  }
-  if (text.includes("guest favourite") || text.includes("guest favorite") || text.includes("guest fav")) {
-    return "guest_fav";                     // Guest Fav?
+  // TRASH
+  if (!fieldType && (text.includes("trash") || text.includes("garbage") || text.includes("dumpster"))) {
+    if (text.includes("day") || text.includes("pickup")) fieldType = "trash_day_reminder";
+    else if (text.includes("process") || text.includes("how")) fieldType = "trash_process";
+    else fieldType = "trash_info";
   }
 
-  // --- ADDRESS ---
-  if (text.includes("address") || text.includes("location") || text.includes("where is it")) {
-    return "address";                       // Address
+  // PARKING
+  if (!fieldType && text.includes("parking")) {
+    fieldType = "parking";
   }
 
-  // Fallback: we didn't clearly recognize a field
-  return null;
+  // QUIET HOURS
+  if (!fieldType && (text.includes("quiet") || text.includes("noise"))) {
+    fieldType = "quiet_hours";
+  }
+
+  // POOL
+  if (!fieldType && (text.includes("pool") || text.includes("hot tub") || text.includes("spa"))) {
+    if (text.includes("temperature") || text.includes("temp")) fieldType = "pool_temperature";
+    else if (text.includes("fence") || text.includes("gate")) fieldType = "pool_fence_gate";
+    else fieldType = "pool_info";
+  }
+
+  // OWNER / MANAGER
+  if (!fieldType && text.includes("owner")) fieldType = "owner_name";
+  if (!fieldType && (text.includes("manager") || text.includes("property manager"))) fieldType = "property_manager";
+  if (!fieldType && text.includes("handyman")) fieldType = "handyman_number";
+
+  // CHECK-IN / OUT
+  if (!fieldType && (text.includes("check-in") || text.includes("checkout"))) {
+    if (text.includes("early") || text.includes("late")) fieldType = "early_late_fee_link";
+    else fieldType = "checkin_checkout";
+  }
+
+  // RULES
+  if (!fieldType && text.includes("events")) fieldType = "events_policy";
+  if (!fieldType && (text.includes("pet") || text.includes("smoking") || text.includes("party"))) {
+    fieldType = "pet_party_smoking_policy";
+  }
+
+  // MISC AMENITIES
+  if (!fieldType && text.includes("bbq")) fieldType = "bbq_grill";
+  if (!fieldType && text.includes("camera")) fieldType = "camera_location";
+  if (!fieldType && text.includes("air mattress")) fieldType = "air_mattress";
+  if (!fieldType && text.includes("supplies")) fieldType = "supplies_provided";
+  if (!fieldType && text.includes("first aid")) fieldType = "first_aid_fire_extinguisher";
+  if (!fieldType && text.includes("washer") || text.includes("laundry")) fieldType = "washer_dryer";
+  if (!fieldType && text.includes("pillow") || text.includes("blanket")) fieldType = "extra_pillows_bedding";
+  if (!fieldType && text.includes("notes")) fieldType = "additional_notes";
+
+  // STRUCTURAL / LISTING
+  if (!fieldType && text.includes("price")) fieldType = "price";
+  if (!fieldType && text.includes("type")) fieldType = "property_type";
+  if (!fieldType && text.includes("floor")) fieldType = "floor";
+  if (!fieldType && text.includes("style")) fieldType = "style";
+  if (!fieldType && text.includes("bed") || text.includes("bath")) fieldType = "bed_bath";
+  if (!fieldType && text.includes("guest")) fieldType = "max_guests";
+  if (!fieldType && text.includes("airbnb") || text.includes("listing")) fieldType = "airbnb_link";
+  if (!fieldType && text.includes("photo")) fieldType = "cover_photo";
+  if (!fieldType && text.includes("rating")) fieldType = "airbnb_rating";
+  if (!fieldType && text.includes("guest fav")) fieldType = "guest_fav";
+  if (!fieldType && text.includes("address") || text.includes("location")) fieldType = "address";
+
+  return { fieldType, datasetHint };
 }
 
 module.exports = { resolveFieldType };

@@ -30,16 +30,28 @@ INTENT DEFINITIONS
       - "What's the wifi password for Clara Lane?"
       - "Where is the camera in Skyline Flat?"
       - "What is the door code for 301?"
+      - "Does unit 607 have free parking?"
+    Key signal: the question focuses on ONE unit or listing.
+
 - "dataset_query":
-    The guest is asking about ALL properties or wants some aggregate or list
+    The guest is asking about ALL properties, or wants some aggregate / list
     derived from the overall data, NOT about just one unit.
     Examples:
       - "Who has the most properties?"
       - "How many properties does DS/Maven have?"
       - "List all properties owned by DS/Amber."
+      - "Which properties have a pool?"
+      - "Show me all properties with free parking."
+      - "How many units do we manage in total?"
+    Key signals:
+      - Mentions "all properties", "which properties", "how many properties/units",
+        "owners", "most properties", "list all", "show me all", etc.
+      - Not tied to a single specific unit.
+
 - "greeting":
     Simple greetings or small talk:
       - "hi", "hello", "hey", "how are you", "good morning", etc.
+
 - "other":
     Anything that is not clearly a property_query, dataset_query, or greeting,
     or where the intent is too ambiguous.
@@ -56,8 +68,8 @@ propertyName:
 
 informationToFind:
 - Use when intent === "property_query".
-- A short natural-language description of what the guest is asking about,
-  e.g. "wifi password", "wifi login", "door lock code", "trash instructions",
+- A short natural-language description of what the guest is asking about, e.g.:
+  "wifi password", "wifi login", "door lock code", "trash instructions",
   "trash day", "parking", "quiet hours", "pool temperature", "owner name",
   "handyman number".
 - If nothing is clear, set informationToFind to null.
@@ -80,8 +92,12 @@ datasetIntentType:
      - The guest asks to list all properties for a specific owner.
      - Example: "Show me all properties owned by DS/Amber."
 
-- If the question doesn't match any of these patterns, set datasetIntentType to null
-  and intent should likely be "other".
+  4) "count_total_properties"
+     - The guest asks how many properties/units exist in total.
+     - Example: "How many properties do we manage in total?"
+
+If the question doesn't match any of these patterns, set datasetIntentType to null
+and intent should likely be "other" (or "property_query" if focused on one unit).
 
 datasetOwnerName:
 - Use ONLY when datasetIntentType is "count_properties_by_owner"
