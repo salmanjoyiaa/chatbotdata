@@ -91,15 +91,26 @@ async function loadSheet() {
 
   if (!SHEET_ID) throw new Error("Missing GOOGLE_SHEET_ID environment variable.");
 
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      type: "service_account",
-      project_id: process.env.GCLOUD_PROJECT_ID,
-      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-      client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    },
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-  });
+  const rawKey = process.env.GOOGLE_PRIVATE_KEY || "";
+
+/**
+ * If the key has literal "\n" sequences (JSON style), convert them to real newlines.
+ * If it already has real newlines, leave it as-is.
+ */
+const normalizedPrivateKey = rawKey.includes("\\n")
+  ? rawKey.replace(/\\n/g, "\n")
+  : rawKey;
+
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    type: "service_account",
+    project_id: process.env.GCLOUD_PROJECT_ID,
+    private_key: normalizedPrivateKey,
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+  },
+  scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+});
+
 
   const sheets = google.sheets({ version: "v4", auth });
 
