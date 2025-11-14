@@ -3,7 +3,7 @@ const DEV_WEBHOOK = import.meta.env.VITE_N8N_WEBHOOK_URL
 // In production use a Netlify Function proxy by default to avoid CORS.
 // You can override the proxy path by setting VITE_N8N_PROXY_URL at build time.
 const WEBHOOK_URL = import.meta.env.PROD
-	? (import.meta.env.VITE_N8N_PROXY_URL || '/.netlify/functions/proxyWebhook')
+	? (import.meta.env.VITE_N8N_PROXY_URL || '/api/proxyWebhook')
 	: DEV_WEBHOOK
 
 export async function sendToWebhook(message) {

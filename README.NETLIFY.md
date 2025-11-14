@@ -9,7 +9,7 @@ Netlify deployment notes
 
 3) Environment variables (set these in Netlify Site > Settings > Build & deploy > Environment)
 - `N8N_WEBHOOK_URL` = your public ngrok URL (e.g. `https://abcd1234.ngrok.io/webhook/...`) — used by the serverless function to call n8n.
-- Optional: `VITE_N8N_PROXY_URL` = override path to the Netlify function (defaults to `/.netlify/functions/proxyWebhook`).
+ - Optional: `VITE_N8N_PROXY_URL` = override path to the proxy function (defaults to `/api/proxyWebhook`).
 
 4) How the app avoids CORS
 - In production the frontend calls the Netlify Function path (same-origin). The function runs server-side and forwards the request to your ngrok URL; the browser never calls ngrok directly so CORS is not triggered.
